@@ -37,14 +37,27 @@ public:
     void watchdog_poll(const char* data, uint32_t size, uint32_t source, int session, int type);
     virtual void text_message(const char* msg, size_t sz, uint32_t source, int session) override;
 
+    void dog_send(Message& msg, int fd);
+
+    // 客户端登录
+    void msg_user_login(Message* data, int fd);
+    void rpcc_user_login(Message* data, int64_t uid, const std::string& rdkey, int fd);
+
+    inline bool serverstop()
+    {
+        return m_server_stop == STOP_SERVER;
+    }
+
 private:
     uint32_t m_gate;
 
-    std::map<int64_t, AgentHandle*> m_agent_uid;
-    std::map<int, AgentFd> m_agent_fd;
-    std::map<uint32_t, AgentHandle> m_agent_handle;
+    std::map<int64_t, AgentHandle*> m_agent_uid; // key => uid
+    std::map<int, AgentFd> m_agent_fd;  // key => fd
+    std::map<uint32_t, AgentHandle> m_agent_handle; // key => 服务handle
 
     DispatcherT<int> m_dog_dsp;
+
+    ServerStopType m_server_stop;
 };
 
 

@@ -11,10 +11,22 @@ Service::~Service()
 
 bool Service::service_init(skynet_context* ctx, const void* parm, int len)
 {
+    m_ctx = ctx;
 }
 
 void Service::service_name(const std::string& name, bool ok)
 {
+    if (name == "main")
+    {
+        m_main = skynet_context_handle(m_ctx);
+    }
+
+    m_service_name = name;
+    pb::iRegisterName req;
+    req.set_handle(skynet_context_handle(m_ctx));
+    req.set_name(name);
+    req.set_ok(ok);
+    service_send(req, m_main);
 }
 
 void Service::expose_service()

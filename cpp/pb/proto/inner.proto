@@ -1,0 +1,8 @@
+syntax = "proto2";
+package pb;
+
+
+message iServerStop
+{
+	optional int32 stop = 1;
+}

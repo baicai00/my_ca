@@ -64,6 +64,8 @@ public:
 
 public:
     bool service_init(skynet_context* ctx, const void* parm, int len);
+
+    // 为服务命名,并将名字注册到main服务,ok为true表示注册后广播到其他服务,且其他服务注册后会通知本服务
     void service_name(const std::string& name, bool ok);
     void expose_service();
 
@@ -97,6 +99,11 @@ public:
     void proto_service_name_list(Message* data, uint32_t handle);
     uint32_t new_skynet_service(const std::string& name, const string& param);
 
+    void service_register_init_func(InitFunc func)
+    {
+        m_init_func.register_init_func(func);
+    }
+
 protected:
     DispatcherT<uint32_t> m_dsp;
 
@@ -104,8 +111,11 @@ private:
     std::map<std::string, uint32_t> m_named_service;
     std::string m_service_name;
 
-    //RegisterInitFunc
-    
+    RegisterInitFunc m_init_func;
+
+public:
+    skynet_context* m_ctx;
+    uint32_t        m_main;
 };
 
 #endif
