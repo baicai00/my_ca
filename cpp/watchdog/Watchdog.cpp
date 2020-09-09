@@ -58,10 +58,37 @@ void Watchdog::destroy_fd_agent(uint32_t handle)
 
 void Watchdog::new_connection(int fd, const std::string& name)
 {
+    AgentFd& af = m_agent_fd[fd];
+    af.m_fd = fd;
+    af.m_ip_port = name;
+    af.m_handle = NULL;
+
+    // let gate service to start request
+    char sendline[100];
+    sprintf(sendline, "start %d", fd);
+    skynet_send(m_ctx, 0, m_gate, PTYPE_TEXT, 0, sendline, strlen(sendline));
 }
 
 void Watchdog::client_disconnect(int fd)
 {
+    std::map<int, AgentFd>::iterator it = m_agent_fd.find(fd);
+    if (it == m_agent_fd.end())
+    {
+        LOG(ERROR) << "socket disconnect no find fd" << fd;
+        return;
+    }
+
+    AgentHandle* handle = it->second.m_handle;
+    if (handle != NULL)
+    {
+        handle->m_fd = NULL;
+        handle->m_disconnect_timer = start_timer(10 * 60 * 100, boost::bind(&Watchdog::destroy_agent, this, handle->m_handle));
+
+        char sendline[100];
+        sprintf(sendline, "dog client_disconnect");
+        size_t len = strlen(sendline);
+        // todo--从这里开始
+    }
 }
 
 void Watchdog::dog_disconnect(int fd)
