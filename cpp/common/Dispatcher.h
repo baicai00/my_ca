@@ -111,6 +111,7 @@ public:
         return dispatch_(data, size, user, true);
     }
 
+    // 对于客户端发过来的消息,user是与客户端通信息的fd(见Watchdog::dog_message)
     DispatcherStatus dispatch_client_message(const char* data, uint32_t size, T user)
     {
         return dispatch_(data, size, user, false);

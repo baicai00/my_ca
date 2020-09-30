@@ -1,6 +1,13 @@
 #ifndef _COMMON_H_
 #define _COMMON_H_
 
+// 临时方案 以后都会统一成PTYPE_TEXT
+#define SUBTYPE_PROTOBUF 16  // PTYPE_PROTO
+#define SUBTYPE_PLAIN_TEXT 19 // 纯文本的类型(注释add by dengkai)
+#define SUBTYPE_RPC_CLIENT 17 // PTYPE_RPC_CLIENT
+#define SUBTYPE_RPC_SERVER 18 // PTYPE_RPC_SERVER
+#define SUBTYPE_AGENT 20 // 给客户端下行消息
+
 // msg service type
 enum ServiceType
 {

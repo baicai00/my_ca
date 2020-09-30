@@ -100,6 +100,18 @@ void Watchdog::dog_disconnect(int fd)
 
 void Watchdog::dog_message(char* data, uint32_t size, int fd)
 {
+    DispatcherStatus status = m_dog_dsp.dispatch_client_message(data, size, fd);
+    if (status != DISPATCHER_SUCCUSS)
+    {
+        destroy_fd_agent(fd);
+        LOG(WARNING) << "watchdog destroy agent cause error msg. fd:" << fd;
+    }
+    if (status == DISPATCHER_CALLBACK_ERROR)
+    {
+        InPack pack;
+        pack.reset(data, size);
+        LOG(WARNING) << "dispatch error. pb name:" << pack.m_type_name;
+    }
 }
 
 void Watchdog::watchdog_poll(const char* data, uint32_t size, uint32_t source, int session, int type)
@@ -107,7 +119,36 @@ void Watchdog::watchdog_poll(const char* data, uint32_t size, uint32_t source, i
     switch (type)
     {
     case PTYPE_TEXT:
+    {
+        uint32_t sub_type;
+        memcpy(&sub_type, data, sizeof(uint32_t));
+        sub_type = ntohl(sub_type);
+
+        data += sizeof(uint32_t);
+        size -= sizeof(uint32_t);
+
+        if (sub_type == SUBTYPE_PROTOBUF)
+        {
+            
+        }
+        else if (sub_type == SUBTYPE_RPC_SERVER)
+        {
+
+        }
+        else if (sub_type == SUBTYPE_PLAIN_TEXT)
+        {
+
+        }
+
+        break;
+    }
     case PTYPE_CLIENT:
+    {
+        char* c = (char*)data;
+        int fd = atoi(strsep(&c, " "));// 这里的fd是skynet框架加进去的吗???什么时候加进去的??? add by dengkai
+        dog_message(c, size - (c - (char*)data), fd);
+        break;
+    }
     case PTYPE_RESPONSE:
     default:
         break;
