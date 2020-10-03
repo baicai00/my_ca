@@ -1,12 +1,17 @@
 #include "Watchdog.h"
 
 
+Watchdog* g_watchdog;
+
 Watchdog::Watchdog()
 {
 }
 
 bool Watchdog::dog_init(const std::string& parm)
 {
+    g_watchdog = this;
+
+    m_domain = atoi(skynet_getenv("domain"));
 }
 
 uint32_t Watchdog::new_agent(int fd, int64_t uid)
@@ -277,4 +282,13 @@ void Watchdog::rpcc_user_login(Message* data, int64_t uid, const std::string& rd
     dog_send(rsp, fd);
 }
 
+ServiceType Watchdog::agent_route_to(const string& proto)
+{
+
+}
+
+uint32_t Watchdog::agent_route_dest(ServiceType type)
+{
+    
+}
 

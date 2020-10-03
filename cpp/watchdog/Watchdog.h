@@ -48,6 +48,15 @@ public:
         return m_server_stop == STOP_SERVER;
     }
 
+    int domain() { return m_domain; }
+
+    // 路由器
+    ServiceType agent_route_to(const string& proto); // 根据协议名称获取对应的服务类型
+    uint32_t agent_route_dest(ServiceType type); // 根据服务类型获取服务的handle
+
+public:
+    std::map<ServiceType, uint32_t> m_service;  // 暴露给外部使用(Agent中有使用) --comment by dengkai
+
 private:
     uint32_t m_gate;
 
@@ -58,7 +67,10 @@ private:
     DispatcherT<int> m_dog_dsp;
 
     ServerStopType m_server_stop;
+
+    int m_domain;// 这个成员好像没什么作用???--add by dengkai
 };
 
+extern Watchdog* g_watchdog;
 
 #endif

@@ -22,7 +22,30 @@ extern "C"
         switch(type)
         {
         case PTYPE_TEXT:
+        {
+            char* data = (char*)msg;
+            uint32_t sub_type;
+            memcpy(&sub_type, data, sizeof(uint32_t));
+            sub_type = ntohl(sub_type);
+
+            if (sub_type == SUBTYPE_PROTOBUF)
+            {
+                //TODO
+            }
+            else if (sub_type == SUBTYPE_PLAIN_TEXT)
+            {
+                //TODO
+            }
+            else if (sub_type == SUBTYPE_AGENT)
+            {
+                //TODO
+            }
+        }
         case PTYPE_CLIENT:
+        {
+            agent->agent_message((char*)msg, sz);
+            break;
+        }
         default:
             break;
         }
