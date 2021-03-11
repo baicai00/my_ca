@@ -116,6 +116,8 @@ private:
 public:
     skynet_context* m_ctx;
     uint32_t        m_main;
+
+    int64_t m_process_uid; // 当前正在处理的uid, 0不针对任何uid
 };
 
 #endif

@@ -4,7 +4,14 @@
 Watchdog* g_watchdog;
 
 Watchdog::Watchdog()
+    : dispatcher_(boost::bind(&Watchdog::onUnknownMessageType, this, _1))
 {
+    m_is_listen = false;
+}
+
+void Watchdog::onUnknownMessageType(const MessagePtr& message)
+{
+    LOG(ERROR) << "onUnknownMessageType: " << message->GetTypeName();
 }
 
 bool Watchdog::dog_init(const std::string& parm)
@@ -12,6 +19,17 @@ bool Watchdog::dog_init(const std::string& parm)
     g_watchdog = this;
 
     m_domain = atoi(skynet_getenv("domain"));
+    dog_register_callback();
+
+    return true;
+}
+
+void Watchdog::dog_register_callback()
+{
+    service_callback(pb::iServicesRegister::descriptor()->full_name(), boost::bind(&Watchdog::register_proto, this, _1, _2));
+    service_callback(pb::iLuaServicesRegister::descriptor()->full_name(), boost::bind(&Watchdog::register_lua_proto, this, _1, _2));
+
+    m_dog_dsp.register_callback(pb::UserLoginREQ::descriptor()->full_name(), boost::bind(&Watchdog::msg_user_login, this, _1, _2));
 }
 
 uint32_t Watchdog::new_agent(int fd, int64_t uid)
@@ -59,6 +77,40 @@ void Watchdog::destroy_fd_agent(int fd)
 
 void Watchdog::destroy_fd_agent(uint32_t handle)
 {
+}
+
+void Watchdog::register_proto(Message*data, uint32_t source)
+{
+    pb::iServicesRegister *msg = dynamic_cast<pb::iServicesRegister*>(data);
+    for (int i = 0; i < msg->item_size(); ++i)
+    {
+        const pb::iProtoRegister& s = msg->item(i);
+        ServiceType type = (ServiceType)s.service();
+        m_service[type] = s.handle();
+        for (int j = 0; j < s.proto_size(); ++j)
+        {
+            m_agent_router[s.proto(j)] = type;
+            LOG(INFO) << "register_proto s.proto(j) = " << s.proto(j) << " type = " << type;
+        }
+    }
+    LOG(INFO) << "watchdog get route table. route type size:" << m_agent_router.size();
+}
+
+void Watchdog::register_lua_proto(Message*data, uint32_t source)
+{
+    pb::iLuaServicesRegister* msg = dynamic_cast<pb::iLuaServicesRegister*>(data);
+
+    for (int i = 0; i < msg->item_size(); ++i)
+    {
+        const pb::iLuaProtoRegister& s = msg->item(i);
+        ServiceType type = (ServiceType)s.service();
+        m_service[type] = s.handle();   // 服务对应的handle--comment by dengkai
+        for (int j = 0; j < s.proto_size(); ++j)
+        {
+            m_agent_router[s.proto(j)] = type;
+        }
+    }
+    LOG(INFO) << "watchdog get route table. route type size:" << m_agent_router.size();
 }
 
 void Watchdog::new_connection(int fd, const std::string& name)
@@ -134,15 +186,36 @@ void Watchdog::watchdog_poll(const char* data, uint32_t size, uint32_t source, i
 
         if (sub_type == SUBTYPE_PROTOBUF)
         {
-            
+            //m_process_uid = get_uid_from_stream(data);
+            //proto(data, size, source);
+            //m_process_uid = 0;
         }
         else if (sub_type == SUBTYPE_RPC_SERVER)
         {
-
+            //m_process_uid = get_uid_from_stream(data);
+            //rpc_event_server(data, size, source, session);
+            //m_process_uid = 0;
         }
         else if (sub_type == SUBTYPE_PLAIN_TEXT)
         {
+            string stream(data, size);
+            LOG(INFO) << "SUBTYPE_PLAIN_TEXT stream = " << stream;
+            string from;
+            tie(from, stream) = divide_string(stream, ' ');
+            if (!stream.empty() && from == "php")
+            {
+                string uid;
+                tie(uid, stream) = divide_string(stream, ' ');
+                LOG(INFO) << "uid = " << uid;
+                if (!stream.empty())
+                {
+                    m_process_uid = atoll(uid.c_str());
+                    LOG(INFO) << "Watchdog::watchdog_poll SUBTYPE_PLAIN_TEXT m_process_uid = " << m_process_uid;
+                }
+            }
 
+            text_message(data, size, source, session);
+            m_process_uid = 0;
         }
 
         break;
@@ -150,7 +223,9 @@ void Watchdog::watchdog_poll(const char* data, uint32_t size, uint32_t source, i
     case PTYPE_CLIENT:
     {
         char* c = (char*)data;
-        int fd = atoi(strsep(&c, " "));// 这里的fd是skynet框架加进去的吗???什么时候加进去的??? add by dengkai
+        // 这里的fd是skynet框架加进去的吗???什么时候加进去的??? add by dengkai
+        // 解答：fd是在service_gate.c的_forward函数中添加的
+        int fd = atoi(strsep(&c, " "));
         dog_message(c, size - (c - (char*)data), fd);
         break;
     }
@@ -162,6 +237,53 @@ void Watchdog::watchdog_poll(const char* data, uint32_t size, uint32_t source, i
 
 void Watchdog::text_message(const char* msg, size_t sz, uint32_t source, int session)
 {
+    char* c = (char*)msg;
+    const char* from = strsep(&c, " ");
+    if (strcmp(from, "gate") == 0)
+    {
+        const char* cmd = strsep(&c, " ");
+        // 接受gate发过来的消息，接受accept, 创建新的连接，以后客户端的协议就会发到agent
+        if (strcmp(cmd, "accept") == 0)
+        {
+            int fd = 0;
+            char name[100];
+            sscanf(c, "%d %s", &fd, name);
+            LOG(INFO) << "Watchdog::text_message new_connection";
+            new_connection(fd, name);
+        }
+        else if (strcmp(cmd, "close") == 0)
+        {
+            int fd = 0;
+            sscanf(c, "%d", &fd);
+            LOG(INFO) << "client_disconnect fd = " << fd;
+            client_disconnect(fd);
+        }
+    }
+    else if (strcmp(from, "php") == 0)
+    {
+        const char* uid = strsep(&c, " ");
+        (void)uid;
+        TextParm parm(c);
+        const char* cmd = parm.get("cmd");
+        string response = "no cmd";
+        if (strcmp(cmd, "stopserver") == 0)
+        {
+            response = "stop server\n";
+            php_stop_server(parm.get_int("type"));
+        }
+        else if (strcmp(cmd, "listen") == 0)
+        {
+            response = "listen ok\n";
+            LOG(INFO) << "watchdog text_message php_listen";
+            php_listen(); // 给gate发送listen, gate就会监听配置地址，并接受客户端的连接
+        }
+
+        skynet_send(m_ctx, 0, source, PTYPE_RESPONSE, session, (void*)response.c_str(), response.size());
+    }
+    else
+    {
+        LOG(INFO) << "unknow text command msg=" << msg;
+    }
 }
 
 void Watchdog::dog_send(Message& msg, int fd)
@@ -292,3 +414,12 @@ uint32_t Watchdog::agent_route_dest(ServiceType type)
     
 }
 
+void Watchdog::php_stop_server(int type)
+{
+
+}
+
+void Watchdog::php_listen()
+{
+
+}

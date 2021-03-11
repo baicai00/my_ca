@@ -1,0 +1,7 @@
+syntax = "proto2";
+package pb;
+
+message UserLocationRSP
+{
+    optional int32 roomid = 1;
+}

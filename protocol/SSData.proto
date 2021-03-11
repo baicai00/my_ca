@@ -1,0 +1,12 @@
+syntax = "proto2";
+package pb;
+
+message iAgentInit
+{
+    optional int64 uid = 1;
+    //optional int32 domain = 2; //这个似乎可以删除 comment by dengkai
+    optional uint32 handle = 3;
+    optional uint32 fd = 4;
+    optional string ip = 5;
+    optional int32 port = 6;
+}
